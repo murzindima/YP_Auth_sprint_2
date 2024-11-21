@@ -1,23 +1,91 @@
-# Проектная работа 7 спринта
+# sprint number 7
 
-1. Создайте интеграцию Auth-сервиса с сервисом выдачи контента и панелью администратора Django, используя контракт, который вы сделали в прошлом задании.
-  
-    При создании интеграции не забудьте учесть изящную деградацию Auth-сервиса. Как вы уже выяснили ранее, Auth сервис один из самых нагруженных, потому что в него ходят большинство сервисов сайта. И если он откажет, сайт отказать не должен. Обязательно учтите этот сценарий в интеграциях с Auth-сервисом.
-2. Добавьте в Auth трасировку и подключите к Jaeger. Для этого вам нужно добавить работу с заголовком x-request-id и отправку трасировок в Jaeger.
-3. Добавьте в сервис механизм ограничения количества запросов к серверу.
-4. Упростите регистрацию и аутентификацию пользователей в Auth-сервисе, добавив вход через социальные сервисы. Список сервисов выбирайте исходя из целевой аудитории онлайн-кинотеатра — подумайте, какими социальными сервисами они пользуются. Например, использовать [OAuth от Github](https://docs.github.com/en/free-pro-team@latest/developers/apps/authorizing-oauth-apps){target="_blank"} — не самая удачная идея. Ваши пользователи не разработчики и вряд ли имеют аккаунт на Github. А вот добавить VK, Google, Yandex или Mail будет хорошей идеей.
+## Description
 
-    Вам не нужно делать фронтенд в этой задаче и реализовывать собственный сервер OAuth. Нужно реализовать протокол со стороны потребителя.
-    
-    Информация по OAuth у разных поставщиков данных: 
-    
-    - [Yandex](https://yandex.ru/dev/oauth/?turbo=true){target="_blank"},
-    - [VK](https://vk.com/dev/access_token){target="_blank"},
-    - [Google](https://developers.google.com/identity/protocols/oauth2){target="_blank"},
-    - [Mail](https://api.mail.ru/docs/guides/oauth/){target="_blank"}.
-    
-## Дополнительное задание
-    
-Реализуйте возможность открепить аккаунт в соцсети от личного кабинета. 
-    
-Решение залейте в репозиторий текущего спринта и отправьте на ревью.
+The project is a monorepo with multiple services. 
+The services are:
+
+- auth api service
+- movie api service
+- admin panel service
+- redis
+- postgres (one for auth and one for movie)
+- elasticsearch
+- jaeger
+- ETL service
+- NGINX
+
+The infrastructure is set up using Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+All ports but NGINX are not exposed to the host. The services are only accessible through the NGINX proxy.
+Configuration made by .env files. Each service has its own .env file in the root of the service directory.
+
+## About the repo structure
+
+admin_panel_service is a Django admin panel service.
+auth_api_service is a FastAPI service for authentication and authorization.
+content_api_service is a FastAPI service for movies.
+postgres_to_elasticsearch is a Python service that listens to the Postgres database and indexes the data in Elasticsearch.
+nginx is the NGINX proxy.
+
+so, you can find the .env.example file in auth_api_service, content_api_service, and admin_panel_service.
+
+About the NGINX hosts. The NGINX is set up to listen to the following hosts:
+
+- admin-panel
+- auth-api
+- content-delivery-api
+- jaeger-ui
+
+You must add the following line to your /etc/hosts file:
+
+```bash
+127.0.0.1 admin-panel auth-api content-delivery-api jaeger-ui
+```
+
+The services are accessible through the following URLs:
+
+- admin-panel: http://admin-panel:8080/admin/
+- auth-api: http://auth-api:8080/api/openapi
+- content-delivery-api: http://content-delivery-api/api/openapi
+- jaeger-ui: http://jaeger-ui:8080/
+
+## How to prepare the databases
+
+The databases are  created automatically. But you must create tables and so on manually.
+
+To create the tables for the auth service, you must run the following command:
+
+```bash
+docker exec -it auth_service_spr7 alembic upgrade head
+docker exec -it auth_service_spr7 python src/tools/init_db.py create-permissions
+docker exec -it auth_service_spr7 python src/tools/init_db.py create-roles
+docker exec -it auth_service_spr7 python src/tools/init_db.py assign-permissions-to-roles
+docker exec -it auth_service_spr7 python src/tools/init_db.py create-admin a@b.com 123qwe Joe Doe
+```
+
+To create the tables for the content service, you must run the following command:
+
+```bash
+docker exec -it postgres_moviesdb_spr7 bash -c "psql -U app movies_database < /dump.sql"
+docker exec -it auth_sprint_2-admin-panel-service-1 python manage.py migrate movies 0001 --fake
+docker exec -it auth_sprint_2-admin-panel-service-1 python manage.py migrate movies 0002
+docker exec -it auth_sprint_2-admin-panel-service-1 python manage.py migrate
+```
+
+After that ETL service will start indexing the data in Elasticsearch.
+
+## About the authoization and authentication
+
+Django and movies API are authenticated by the auth service. 
+So, you must create a user in the auth service to access the admin panel and the movies API.
+
+You can create local user or use the OAuth2 flow to get the access and refresh tokens.
+
+## Repository Link
+
+https://github.com/IlyasDevelopment/Auth_sprint_2
