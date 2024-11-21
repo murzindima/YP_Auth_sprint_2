@@ -88,4 +88,4 @@ You can create local user or use the OAuth2 flow to get the access and refresh t
 
 ## Repository Link
 
-https://github.com/IlyasDevelopment/Auth_sprint_2
+https://github.com/murzindima/Auth_sprint_2
